@@ -33,9 +33,9 @@ var appServer = function(config) {
 	// Load application modules
 	self.load_apps = function(app_dir,root) {
 		var app_directories = function(srcpath) {
-		  return fs.readdirSync(srcpath).filter(function(file) {
-			return fs.statSync(path.join(srcpath, file)).isDirectory();
-		  });
+			return fs.readdirSync(srcpath).filter(function(file) {
+				return fs.statSync(path.join(srcpath, file)).isDirectory();
+			});
 		};
 		app_directories(app_dir).forEach(function(dir) {
 			var package_json = path.join(app_dir,dir,"/package.json");
@@ -70,10 +70,8 @@ var appServer = function(config) {
 				// The express() function in alexa-app doesn't play nicely with hotswap,
 				// so bootstrap manually to express
 				var endpoint = (root||'/') + (app.endpoint || app.name);
-				if (config.verify)
-				{
-					self.express.use(endpoint, function(req, res, next)
-					{
+				if (config.verify) {
+					self.express.use(endpoint, function(req, res, next) {
 						req.verified = false;
 						if (!req.headers.signaturecertchainurl) {
 							return next();
@@ -123,11 +121,9 @@ var appServer = function(config) {
 					self.express.get(endpoint,function(req,res) {
 						if (typeof req.param('schema')!="undefined") {
 							res.set('Content-Type', 'text/plain').send(app.schema());
-						}
-						else if (typeof req.param('utterances')!="undefined") {
+						} else if (typeof req.param('utterances')!="undefined") {
 							res.set('Content-Type', 'text/plain').send(app.utterances());
-						}
-						else {
+						} else {
 							res.render('test',{"app":app,"schema":app.schema(),"customSlotTypes":(app.customSlotTypes?app.customSlotTypes():""),"utterances":app.utterances(),"intents":app.intents});
 						}
 					});
@@ -150,9 +146,11 @@ var appServer = function(config) {
 				return fs.statSync(path.join(srcpath, file)).isFile();
 			});
 		};
+
 		server_files(server_dir).forEach(function(file) {
 			file = fs.realpathSync( path.join(server_dir,file) );
 			self.log("   Loaded "+file);
+
 			var func = require(file);
 			if (typeof func=="function") {
 				func(self.express, self);
@@ -166,24 +164,12 @@ var appServer = function(config) {
 		self.express.use(bodyParser.urlencoded({ extended: true }));
 
 		//We need the rawBody for request verification
-		self.express.use(function(req, res, next)
-		{
-			// mark the request body as already having been parsed so it's ignored by
-			// other body parser middlewares
-			req._body = true;
-			req.rawBody = '';
-			req.on('data', function(data) {
-				return req.rawBody += data;
-			});
-			req.on('end', function() {
-				try {
-					req.body = JSON.parse(req.rawBody);
-				} catch (error) {
-					req.body = {};
-				}
-				next();
-			});
-		});
+		self.express.use(bodyParser.json({
+			verify: function(req, res, buf, encoding) {
+				req.rawBody = buf.toString();
+			}
+		}));
+
 		self.express.set('views', path.join(__dirname,'views'));
 		self.express.set('view engine', 'ejs');
 
@@ -197,8 +183,7 @@ var appServer = function(config) {
 		if (fs.existsSync(static_dir) && fs.statSync(static_dir).isDirectory()) {
 			self.log("Serving static content from: "+static_dir);
 			self.express.use(express.static(static_dir));
-		}
-		else {
+		} else {
 			self.log("Not serving static content because directory ["+static_dir+"] does not exist");
 		}
 
@@ -207,8 +192,7 @@ var appServer = function(config) {
 		if (fs.existsSync(server_dir) && fs.statSync(server_dir).isDirectory()) {
 			self.log("Loading server-side modules from: "+server_dir);
 			self.load_server_modules(server_dir);
-		}
-		else {
+		} else {
 			self.log("No server modules loaded because directory ["+server_dir+"] does not exist");
 		}
 
@@ -217,47 +201,41 @@ var appServer = function(config) {
 		if (fs.existsSync(app_dir) && fs.statSync(app_dir).isDirectory()) {
 			self.log("Loading apps from: "+app_dir);
 			self.load_apps(app_dir,config.app_root || '/alexa/');
-		}
-		else {
+		} else {
 			self.log("Apps not loaded because directory ["+app_dir+"] does not exist");
 		}
 
-		if(config.httpsEnabled == true) {
+		if (config.httpsEnabled == true) {
 			self.log("httpsEnabled is true. Reading HTTPS config");
 
-			if(config.privateKey != undefined && config.certificate != undefined && config.httpsPort != undefined) { //Ensure that all of the needed properties are set
+			if (config.privateKey != undefined && config.certificate != undefined && config.httpsPort != undefined) { //Ensure that all of the needed properties are set
 				var privateKeyFile = 'sslcert/' + config.privateKey;
 				var certificateFile = 'sslcert/' + config.certificate;
 
-				if(fs.existsSync(privateKeyFile) && fs.existsSync(certificateFile)) { //Make sure the key and cert exist.
-
+				if (fs.existsSync(privateKeyFile) && fs.existsSync(certificateFile)) { //Make sure the key and cert exist.
 					var privateKey  = fs.readFileSync(privateKeyFile, 'utf8');
-					var certificate = fs.readFileSync(certificateFile  , 'utf8');
+					var certificate = fs.readFileSync(certificateFile, 'utf8');
 
-						if(privateKey != undefined && certificate != undefined) {
-							var credentials = {key: privateKey, cert: certificate};
+					if (privateKey != undefined && certificate != undefined) {
+						var credentials = {key: privateKey, cert: certificate};
 
-									try { //The line below can fail it the certs were generated incorrectly. But we can continue startup without HTTPS
-									https.createServer(credentials, self.express).listen(config.httpsPort); //create the HTTPS server
-									self.log("Listening on HTTPS port " + config.httpsPort);
-								}catch(error) {
-									self.log("Failed to listen via HTTPS Error: " + error);
-								}
-						} else {
-						self.log("Failed to load privateKey or certificate from /sslcert. HTTPS will not be enabled");
-
+						try { //The line below can fail it the certs were generated incorrectly. But we can continue startup without HTTPS
+							https.createServer(credentials, self.express).listen(config.httpsPort); //create the HTTPS server
+							self.log("Listening on HTTPS port " + config.httpsPort);
+						} catch (error) {
+							self.log("Failed to listen via HTTPS Error: " + error);
 						}
-
+					} else {
+						self.log("Failed to load privateKey or certificate from /sslcert. HTTPS will not be enabled");
+					}
 				} else {
-				self.log("privateKey: '" + config.privateKey +  "' or certificate: '" + config.certificate + "' do not exist in /sslcert. HTTPS will not be enabled");
-
+					self.log("privateKey: '" + config.privateKey + "' or certificate: '" + config.certificate + "' do not exist in /sslcert. HTTPS will not be enabled");
 				}
-		} else {
-			self.log("privatekey, httpsPort, or certificate paramater not set in config. HTTPS will not be enabled");
-
+			} else {
+				self.log("privatekey, httpsPort, or certificate paramater not set in config. HTTPS will not be enabled");
+			}
 		}
 
-	}
 		// Start the server listening
 		config.port = config.port || process.env.port || 80;
 		var instance = self.express.listen(config.port);
